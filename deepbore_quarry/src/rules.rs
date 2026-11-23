@@ -4,7 +4,7 @@
 use serde::{Deserialize, Serialize};
 
 /// The folder in the world's folder.
-pub const DIR: &str = "horizon-deepbore-quarry";
+pub const DIR: &str = "deepbore-quarry";
 pub const BLOCK: &str = "deepbore_quarry:quarry";
 pub const MENU: &str = "deepbore_quarry:quarry";
 /// The container: the fuel slot, the upgrade slots, then slots the screen
@@ -449,8 +449,16 @@ impl Loads {
             .find(|h| h.key == *key)
             .map_or_else(Vec::new, |h| h.chunks.clone());
         let change = Change {
-            add: chunks.iter().filter(|c| !before.contains(c)).copied().collect(),
-            remove: before.iter().filter(|c| !chunks.contains(c)).copied().collect(),
+            add: chunks
+                .iter()
+                .filter(|c| !before.contains(c))
+                .copied()
+                .collect(),
+            remove: before
+                .iter()
+                .filter(|c| !chunks.contains(c))
+                .copied()
+                .collect(),
         };
         self.holds.retain(|h| h.key != *key);
         self.holds.push(Hold {
@@ -575,7 +583,10 @@ pub mod store {
 
     /// Saves when something changed. The flag is cleared only after the save
     /// succeeded, so a failed write is tried again on the next call.
-    pub fn save_if_changed(changed: &mut bool, save: impl FnOnce() -> io::Result<()>) -> io::Result<()> {
+    pub fn save_if_changed(
+        changed: &mut bool,
+        save: impl FnOnce() -> io::Result<()>,
+    ) -> io::Result<()> {
         if !*changed {
             return Ok(());
         }
@@ -1024,7 +1035,7 @@ mod later_tests {
     fn slots_are_named() {
         assert_eq!(FUEL_SLOT, 0);
         assert_eq!(FIRST_UPGRADE + UPGRADE_SLOTS, FIRST_BUFFER);
-        assert_eq!(SLOTS, 14); // data/deepbore_quarry/horizon/menu/quarry.json says the same
+        assert_eq!(SLOTS, 14); // data/deepbore_quarry/sunrise/menu/quarry.json says the same
     }
 }
 
@@ -1071,8 +1082,8 @@ mod review_tests {
 
 #[cfg(test)]
 mod store_tests {
-    use super::store::{Damaged, read_json, save_if_changed, write_json};
     use super::Loads;
+    use super::store::{Damaged, read_json, save_if_changed, write_json};
     use std::{fs, io, path::PathBuf};
 
     fn scratch(name: &str) -> PathBuf {
@@ -1145,7 +1156,10 @@ mod ticket_tests {
     #[test]
     fn tickets_are_taken_again_when_the_world_opens() {
         let mut l = Loads::default();
-        let (a, n) = (at("minecraft:overworld", [0, 64, 0]), at("minecraft:the_nether", [9, 64, 0]));
+        let (a, n) = (
+            at("minecraft:overworld", [0, 64, 0]),
+            at("minecraft:the_nether", [9, 64, 0]),
+        );
         l.hold(1, &a, vec![[0, 0], [0, 1]]);
         l.hold(2, &n, vec![[1, 0]]);
         // Tickets aren't saved: the record is what a reopened world holds again.

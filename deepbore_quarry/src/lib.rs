@@ -9,10 +9,10 @@ mod rules;
 mod world;
 
 use mod_api::{
-    BlockChangedEvent, BlockEntityTypeKey, BlockKey, BlocksEvent, BreakBlockEvent, Flow, Hooks, HostSide,
-    InteractionResult, ItemKey, ItemsEvent, LevelHost, ModContainer, ParticleKey, PlayerLoggedInEvent,
-    RegisterCommandsEvent, Registrar, RegistrationContext, RightClickBlockEvent, RunModCommandEvent, ServerHost,
-    ServerTickEvent, TicketController, ValidateTicketsEvent,
+    BlockChangedEvent, BlockEntityTypeKey, BlockKey, BlocksEvent, BreakBlockEvent, Flow, Hooks,
+    HostSide, InteractionResult, ItemKey, ItemsEvent, LevelHost, ModContainer, ParticleKey,
+    PlayerLoggedInEvent, RegisterCommandsEvent, Registrar, RegistrationContext,
+    RightClickBlockEvent, ServerHost, ServerTickEvent, TicketController, ValidateTicketsEvent,
 };
 use std::sync::OnceLock;
 
@@ -33,7 +33,8 @@ pub(crate) struct Keys {
 static KEYS: OnceLock<Keys> = OnceLock::new();
 
 pub(crate) fn keys() -> &'static Keys {
-    KEYS.get().expect("the mod's keys are looked up at registration")
+    KEYS.get()
+        .expect("the mod's keys are looked up at registration")
 }
 
 /// The upgrade an item is, if it is one.
@@ -52,14 +53,17 @@ const UPGRADES: [&str; 4] = [
 #[derive(Default)]
 struct Mod;
 
-#[mod_api::horizon_mod]
+#[mod_api::sunrise_mod]
 impl Hooks for Mod {
     fn register(&self, r: &mut dyn Registrar, _: &RegistrationContext) {
-        // Full ids: a bare name would take the mod's id (deepbore_quarry_native) as its namespace, and a
-        // saved quarry's block entity is `deepbore_quarry:quarry`.
+        // Full ids: a saved quarry's block entity is `deepbore_quarry:quarry`.
         let block = r.block_key(rules::BLOCK);
-        let kind: BlockEntityTypeKey = r.block_entity_type(rules::BLOCK).blocks(&[rules::BLOCK]).build();
-        r.block_entity_part(&kind, quarry::Quarry).expect("the quarry's block entity type is the mod's own");
+        let kind: BlockEntityTypeKey = r
+            .block_entity_type(rules::BLOCK)
+            .blocks(&[rules::BLOCK])
+            .build();
+        r.block_entity_part(&kind, quarry::Quarry)
+            .expect("the quarry's block entity type is the mod's own");
         // Hoppers put fuel in, from any side, and take nothing out.
         r.block_container(
             &block,
@@ -68,10 +72,13 @@ impl Hooks for Mod {
                 faces: std::array::from_fn(|_| vec![rules::FUEL_SLOT]),
                 inputs: vec![rules::FUEL_SLOT],
                 outputs: Vec::new(),
+                insert_rules: Vec::new(),
                 menu: Some(rules::MENU.to_owned()),
             },
         );
         r.menu_part(rules::MENU, quarry::QuarryMenu);
+        r.register_menu_screen(rules::MENU, std::sync::Arc::new(quarry::QuarryScreen))
+            .expect("the quarry's menu is the mod's own");
         let item = r.item_key(rules::BLOCK);
         r.item_part(item, quarry::QuarryItem);
         let tickets = r.register_ticket_controller(rules::BLOCK, true);
@@ -79,7 +86,8 @@ impl Hooks for Mod {
         let _ = KEYS.set(Keys {
             block,
             tickets,
-            airs: ["minecraft:air", "minecraft:cave_air", "minecraft:void_air"].map(|id| r.block_key(id)),
+            airs: ["minecraft:air", "minecraft:cave_air", "minecraft:void_air"]
+                .map(|id| r.block_key(id)),
             cobblestone: r.block_key("minecraft:cobblestone"),
             pickaxe: r.item_key("minecraft:diamond_pickaxe"),
             bucket: r.item_key("minecraft:bucket"),
@@ -90,19 +98,15 @@ impl Hooks for Mod {
     }
 
     fn blocks(&self, _: &RegistrationContext, event: &mut BlocksEvent<'_>) {
-        world::blocks(event.blocks);
+        world::blocks(event);
     }
 
     fn items(&self, _: &RegistrationContext, event: &mut ItemsEvent<'_>) {
-        world::items(event.items);
+        world::items(event);
     }
 
     fn register_commands(&self, _: &mut dyn ServerHost, event: &mut RegisterCommandsEvent<'_>) {
         world::commands(event.commands);
-    }
-
-    fn run_mod_command(&self, host: &mut dyn ServerHost, event: &mut RunModCommandEvent<'_>) -> Flow {
-        world::command(host, event)
     }
 
     /// Another player's quarry doesn't open, nor break.
@@ -119,13 +123,20 @@ impl Hooks for Mod {
     }
 
     fn break_block(&self, host: &mut dyn ServerHost, event: &mut BreakBlockEvent<'_>) -> Flow {
-        if quarry::refused(host, event.pos) { Flow::Cancel } else { Flow::Continue }
+        if quarry::refused(host, event.pos) {
+            Flow::Cancel
+        } else {
+            Flow::Continue
+        }
     }
 
     /// Any way a quarry goes: its chunks are let go.
     fn block_changed(&self, _: &dyn LevelHost, event: &mut BlockChangedEvent) {
         if event.old.block() == keys().block && event.new.block() != keys().block {
-            world::quarry_gone(&event.dimension.key().to_string(), [event.pos.x, event.pos.y, event.pos.z]);
+            world::quarry_gone(
+                &event.dimension.key().to_string(),
+                [event.pos.x, event.pos.y, event.pos.z],
+            );
         }
     }
 

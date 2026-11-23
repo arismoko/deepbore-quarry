@@ -3,8 +3,9 @@
 
 use crate::{keys, rules};
 use mod_api::{
-    Block, BlockProperties, Command, CommandArgumentValue, Flow, Item, Rarity, RunModCommandEvent,
-    ServerHost, Text, TicketOwner, ValidateTicketsEvent, text::TextStyle,
+    Block, BlockProperties, BlocksEvent, Command, CommandArgumentValue, CommandInvocation,
+    CommandRegistration, Item, ItemsEvent, Rarity, ServerHost, Text, TicketOwner,
+    ValidateTicketsEvent, text::TextStyle,
 };
 use rules::store;
 use std::{
@@ -52,7 +53,10 @@ fn lock() -> MutexGuard<'static, Option<WorldState>> {
 /// A world file, or an empty one when there is none. A damaged file is moved aside
 /// (`<name>.corrupt-<seconds>`), logged as an error and said in chat; the answer's `false` means it
 /// couldn't be moved, so it must not be written over.
-fn read_json<T: serde::de::DeserializeOwned + Default>(path: &Path, notices: &mut Vec<String>) -> (T, bool) {
+fn read_json<T: serde::de::DeserializeOwned + Default>(
+    path: &Path,
+    notices: &mut Vec<String>,
+) -> (T, bool) {
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map_or(0, |d| d.as_secs());
@@ -63,7 +67,12 @@ fn read_json<T: serde::de::DeserializeOwned + Default>(path: &Path, notices: &mu
             let (line, writable) = match &kept {
                 Some(kept) => {
                     let kept = kept.file_name().and_then(|n| n.to_str()).unwrap_or("?");
-                    (format!("{name} could not be read ({error}); it was kept as {kept} and a new one is started."), true)
+                    (
+                        format!(
+                            "{name} could not be read ({error}); it was kept as {kept} and a new one is started."
+                        ),
+                        true,
+                    )
                 }
                 None => (
                     format!(
@@ -93,7 +102,8 @@ pub(crate) fn world(host: &dyn ServerHost) -> Option<MutexGuard<'static, Option<
     if state.as_ref().is_none_or(|s| s.dir != dir) {
         let mut notices = Vec::new();
         let (config, _) = read_json(&dir.join("config.json"), &mut notices);
-        let (mut loads, loads_writable) = read_json::<rules::Loads>(&dir.join(rules::HOLDS_FILE), &mut notices);
+        let (mut loads, loads_writable) =
+            read_json::<rules::Loads>(&dir.join(rules::HOLDS_FILE), &mut notices);
         let (unforce, migrated) = migrate_old_loads(&dir, &mut loads, &mut notices);
         *state = Some(WorldState {
             config,
@@ -161,14 +171,26 @@ pub(crate) fn ticket(tickets: &mut Vec<Ticket>, key: &rules::Key, change: rules:
 }
 
 /// Takes or lets go of one chunk under a quarry's ticket. False where the level isn't open.
-fn force(host: &mut dyn ServerHost, dimension: &str, quarry: [i32; 3], chunk: [i32; 2], hold: bool) -> bool {
+fn force(
+    host: &mut dyn ServerHost,
+    dimension: &str,
+    quarry: [i32; 3],
+    chunk: [i32; 2],
+    hold: bool,
+) -> bool {
     let Some(level) = host.level(dimension) else {
         return false;
     };
     let Some(chunk_ref) = level.chunk_ref(host, chunk) else {
         return false;
     };
-    chunk_ref.set_mod_forced(host, keys().tickets, TicketOwner::Block(quarry), hold, false);
+    chunk_ref.set_mod_forced(
+        host,
+        keys().tickets,
+        TicketOwner::Block(quarry),
+        hold,
+        false,
+    );
     true
 }
 
@@ -209,9 +231,17 @@ pub(crate) fn server_tick(host: &mut dyn ServerHost) {
         let st = guard.as_mut().expect("opened");
         // The game keeps tickets with the world now, but those of 0.2 and older are dropped as it
         // loads: at the first tick every saved hold is taken again (a chunk held already stays held).
-        let wake = if st.woken { Vec::new() } else { st.loads.tickets() };
+        let wake = if st.woken {
+            Vec::new()
+        } else {
+            st.loads.tickets()
+        };
         st.woken = true;
-        (std::mem::take(&mut st.tickets), std::mem::take(&mut st.unforce), wake)
+        (
+            std::mem::take(&mut st.tickets),
+            std::mem::take(&mut st.unforce),
+            wake,
+        )
     };
     // Horizon opens the Nether and the End when someone goes there, and a level's saved tickets don't
     // open it as the world opens (vanilla's levels all open with the server). A command run in the
@@ -220,7 +250,8 @@ pub(crate) fn server_tick(host: &mut dyn ServerHost) {
     for (dimension, quarry, chunk) in wake {
         if host.level(&dimension).is_none() {
             if !opening.contains(&dimension) {
-                host.commands().run_command(&format!("execute in {dimension} run forceload query"));
+                host.commands()
+                    .run_command(&format!("execute in {dimension} run forceload query"));
                 opening.push(dimension);
             }
             continue;
@@ -235,7 +266,10 @@ pub(crate) fn server_tick(host: &mut dyn ServerHost) {
         if st.wake_tries < 100 {
             st.woken = false;
         } else {
-            log::warn!("[deepbore_quarry] {} didn't open: their quarries wait for someone to go there", opening.join(", "));
+            log::warn!(
+                "[deepbore_quarry] {} didn't open: their quarries wait for someone to go there",
+                opening.join(", ")
+            );
         }
     }
     // A world from 0.1.x: its own /forceloads go, once; the quarries hold tickets now.
@@ -255,9 +289,14 @@ pub(crate) fn server_tick(host: &mut dyn ServerHost) {
         let path = st.dir.join(rules::HOLDS_FILE);
         // A failure leaves loads_changed set: the next tick tries again. It is logged once, when
         // saving starts failing, and again when it works.
-        match store::save_if_changed(&mut st.loads_changed, || store::write_json(&path, &st.loads)) {
+        match store::save_if_changed(&mut st.loads_changed, || {
+            store::write_json(&path, &st.loads)
+        }) {
             Err(e) if !st.loads_failing => {
-                log::error!("[deepbore_quarry] {} was not saved, trying again each tick: {e}", path.display());
+                log::error!(
+                    "[deepbore_quarry] {} was not saved, trying again each tick: {e}",
+                    path.display()
+                );
                 st.loads_failing = true;
             }
             Ok(()) if st.loads_failing => {
@@ -271,7 +310,9 @@ pub(crate) fn server_tick(host: &mut dyn ServerHost) {
 
 /// The server's limit on a quarry's side.
 pub(crate) fn max_side(host: &dyn ServerHost) -> i32 {
-    world(host).map_or(rules::side(3), |g| g.as_ref().expect("opened").config.max_side)
+    world(host).map_or(rules::side(3), |g| {
+        g.as_ref().expect("opened").config.max_side
+    })
 }
 
 pub(crate) fn red(line: Text) -> Text {
@@ -295,7 +336,7 @@ pub(crate) fn logged_in(host: &mut dyn ServerHost, player: u128) {
 
 /// The quarry. A furnace is its template: it opens a menu when used, and its `facing` is the side
 /// towards the player who placed it.
-pub(crate) fn blocks(blocks: &mut Vec<Block>) {
+pub(crate) fn blocks(event: &mut BlocksEvent<'_>) {
     let mut block = Block::new(rules::BLOCK, "minecraft:furnace").with_item(true);
     block.properties = BlockProperties {
         hardness: Some(3.5),
@@ -304,21 +345,25 @@ pub(crate) fn blocks(blocks: &mut Vec<Block>) {
         sounds: Some("minecraft:netherite_block".into()),
         ..Default::default()
     };
-    blocks.push(block);
+    // A refused declaration is reported at startup with its reason.
+    let _ = event.register(block);
 }
 
-pub(crate) fn items(items: &mut Vec<Item>) {
+pub(crate) fn items(event: &mut ItemsEvent<'_>) {
     for id in crate::UPGRADES {
         let mut item = Item::new(id, "minecraft:paper");
         item.max_stack_size = Some(16);
         item.rarity = Some(Rarity::Uncommon);
-        items.push(item);
+        let _ = event.register(item);
     }
 }
 
-pub(crate) fn commands(commands: &mut Vec<Command>) {
-    commands.push(Command::op("deepbore maxsize", 2));
-    commands.push(Command::op("deepbore maxsize <size:text>", 2));
+pub(crate) fn commands(commands: &mut Vec<CommandRegistration>) {
+    for usage in ["deepbore maxsize", "deepbore maxsize <size:text>"] {
+        commands.push(
+            Command::op(usage, 2).executes(|host, _, invocation| Ok(command(host, invocation))),
+        );
+    }
 }
 
 fn size_line(side: i32) -> Text {
@@ -326,20 +371,18 @@ fn size_line(side: i32) -> Text {
     Text::translate("deepbore_quarry.maxsize.set", vec![n.clone(), n])
 }
 
-pub(crate) fn command(host: &mut dyn ServerHost, event: &mut RunModCommandEvent<'_>) -> Flow {
-    if event.command.literals.first().map(String::as_str) != Some("deepbore") {
-        return Flow::Continue;
-    }
-    let size = match event.command.argument("size") {
+/// `/deepbore maxsize [size]`: shows or sets the largest square a quarry may dig.
+fn command(host: &mut dyn ServerHost, invocation: &CommandInvocation) -> i32 {
+    let size = match invocation.argument("size") {
         Some(CommandArgumentValue::String(size)) => Some(size),
         _ => None,
     };
     let Some(mut guard) = world(host) else {
-        return Flow::Cancel;
+        return 0;
     };
     let st = guard.as_mut().expect("opened");
-    let reply = match (event.command.literals.get(1).map(String::as_str), size) {
-        (Some("maxsize"), Some(arg)) => match rules::parse_max_side(&arg) {
+    let reply = match (invocation.literals.get(1).map(String::as_str), size) {
+        (Some("maxsize"), Some(arg)) => match rules::parse_max_side(arg) {
             Some(side) => {
                 st.config.max_side = side;
                 match write_json(&st.dir.join("config.json"), &st.config) {
@@ -354,5 +397,5 @@ pub(crate) fn command(host: &mut dyn ServerHost, event: &mut RunModCommandEvent<
     };
     drop(guard);
     let _ = host.commands().feedback(reply);
-    Flow::Cancel
+    1
 }

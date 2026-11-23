@@ -1,11 +1,7 @@
 # Deepbore Quarry
 
-A mod for [Horizon](https://github.com/horizon-rust/horizon) (Minecraft: Java Edition 26.3 in Rust). A machine that digs a
+A mod for [Sunrise](https://playsunrise.net) (Minecraft: Java Edition 26.3). A machine that digs a
 square pit down to bedrock on furnace fuel and fills a chest beside it, under a moving gantry with a drill.
-
-> **Install one mod:** `deepbore_quarry_native` on the launcher's Mods page, then press Build. From 0.3.0 it is one
-> native package on Horizon's mod API, with its textures, text and recipes inside it. If you still have the separate
-> `deepbore_quarry` (assets), remove it: both use the `deepbore_quarry` namespace, and the game keeps only one of them.
 
 ![A quarry at work: a yellow gantry over a deep square pit in a meadow, with the machine and its chest at the edge](docs/images/quarry.jpg)
 
@@ -87,20 +83,15 @@ Operators have two commands:
 | `/deepbore maxsize` | Shows the largest area this world allows |
 | `/deepbore maxsize <5\|9\|13\|17>` | Sets it |
 
-A quarry over the limit stops and says so. Each world keeps the setting in `horizon-deepbore-quarry/config.json`, in the
+A quarry over the limit stops and says so. Each world keeps the setting in `deepbore-quarry/config.json`, in the
 world's folder.
 
 ## Good to know
 
 - Every player needs the mod. It runs with your account's permissions, as every native mod does.
-- 0.3.1 is built on Horizon Nightly 2026-11-22 (2b77287), on its mod SDK. A world from 0.2 should keep
-  its quarries, since what is saved is the same (the block entity `deepbore_quarry:quarry`, its slots, its state and
-  `horizon-deepbore-quarry/` in the world), and the chunks the quarries held are taken again when the world opens.
-  Back up a world you care about before the first open.
+- This version is made for the Sunrise Dev build `dev-2026-11-22-7cfdf81`; Sunrise builds it from source on your computer for the game build you run.
 - A chunk-upgraded quarry in the Nether or the End keeps working with nobody there, also after the world reopens:
-  the mod opens such a level as the world opens (Horizon opens those levels only when someone goes there).
-- A world from 0.1.x moves over by itself: the chunks its quarries forced with `/forceload` are released once,
-  the quarries hold chunk tickets instead, and `loads.json` is kept as `loads.json.migrated`.
+  the mod opens such a level as the world opens (the game opens those levels only when someone goes there).
 - The gantry is drawn while you are within 64 blocks of the quarry, so it is gone from the bottom of a very deep pit.
 - Torches, ladders and doors on what the quarry digs can fall to the ground with their support.
 - A container from another mod takes the drops only if its name ends in `chest`, `barrel` or `shulker_box`.
@@ -111,20 +102,21 @@ assets are included.
 
 ## Build
 
-The package is the `deepbore_quarry/` folder: `horizon-mod.toml`, `Cargo.toml`, `src/`, `assets/` and `data/`. The
-repository's tools and pictures stay outside it, since a package takes only its own files.
+The package is the `deepbore_quarry/` folder: `sunrise-mod.toml`, `Cargo.toml`, `src/`, `assets/`, `data/` and its registry
+page (`page.toml`, `page/`). With the Sunrise mod tool (`cargo sunrise-mod`, from the Sunrise SDK) and Rust:
 
 ```sh
-cd deepbore_quarry && cargo test                # the rules
-horizon-launcher native-build deepbore_quarry --instance NAME --trust-native-code
-cd deepbore_quarry && cargo horizon-mod build   # target/horizon-mod/deepbore_quarry_native.hmod
-python tools/ingame_test.py GAME_FOLDER INSTANCE VERSION [SCENARIO ...]   # in the game, through the launcher's Play
+cd deepbore_quarry
+cargo sunrise-mod build    # target/sunrise-mod/deepbore_quarry.smod
+cargo sunrise-mod run      # builds it and starts the game with it
+cargo test                 # the rules
 ```
 
-Any `cargo horizon-mod` command fetches the pinned SDK into `deepbore_quarry/.horizon/sdk/` (never committed).
-`Cargo.lock` holds registry pins only, at the versions the pinned Horizon uses: put it back after a local cargo run.
+Any `cargo sunrise-mod` command fetches the pinned SDK into `deepbore_quarry/.sunrise/sdk/` (never committed).
 `python tools/make_textures.py` redraws the textures.
 
 ## License
 
 MIT
+
+Originally made for Horizon by bioneisme ([Bioneisme/deepbore-quarry](https://github.com/Bioneisme/deepbore-quarry)); ported to Sunrise by arismoko.

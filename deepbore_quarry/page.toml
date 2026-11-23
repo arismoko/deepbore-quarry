@@ -1,0 +1,20 @@
+summary = "A machine that digs a square pit down to bedrock on furnace fuel and fills a chest beside it."
+description = """
+A machine that digs a square pit down to bedrock on furnace fuel and fills a chest beside it.
+
+Deepbore Quarry by bioneisme, for [Sunrise](https://playsunrise.net) (Minecraft Java 26.3), written in Rust on Sunrise's mod API.
+
+What it does:
+
+- A quarry that digs a square pit from its own level to bedrock, like an unenchanted diamond pickaxe, under a moving gantry and drill.
+- Runs on anything a furnace burns, fed by hand or by hopper; its drops go to a chest, barrel or shulker box beside it, and wait inside when that is full.
+- Its screen shows fuel left, pit size, current layer and why it stands still (no fuel, no chest, full chest, fluid, redstone signal, finished).
+- Four upgrade slots: Area (up to 17x17), Speed (up to a block every 0.25 s), Fluids (plugs water and lava and digs on) and Chunk (keeps its chunks loaded while you are away).
+- Only the owner or an operator can open or break a quarry; operators set the largest allowed area with `/deepbore maxsize`.
+- English and Russian text; all art is original.
+"""
+categories = ["technology", "utility"]
+
+[[screenshots]]
+path = "page/quarry.png"
+caption = "A quarry at work over its pit."
