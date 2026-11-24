@@ -396,6 +396,6 @@ fn command(host: &mut dyn ServerHost, invocation: &CommandInvocation) -> i32 {
         _ => Text::translate("deepbore_quarry.maxsize.usage", Vec::new()),
     };
     drop(guard);
-    let _ = host.commands().feedback(reply);
+    let _ = host.commands().feedback(reply, false);
     1
 }
