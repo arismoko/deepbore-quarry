@@ -4,11 +4,11 @@ use crate::{keys, rules, upgrade_of, world};
 use mod_api::{
     BlockEntityPart, BlockEntityRenderBoundingBoxEvent, BlockEntitySubmitEvent,
     BlockEntityTickEvent, BlockEntityTicksEvent, BlockEntityUpdateTagEvent, BlockPart, BlockState,
-    BlockUpdateFlags, ClientHost, Compound, CubeFace, Direction, DrawContext, Host,
+    BlockUpdateFlags, ClientHost, Compound, CubeFace, Direction, DrawContext, Flow, Host,
     HostBlockStates, HostTransaction, ITEMS, ItemPart, ItemResource, ItemStack, LevelRef,
-    LightLayer, MenuButtonEvent, MenuContainer, MenuPart, MenuScreen, MenuScreenFactory,
-    MenuScreenFrame, MenuScreenLayout, MenuScreenOpen, MenuSlotRulesEvent, OnBlockPlacedByEvent,
-    ParticleOptions, ScreenSlot, ServerHost, SoundSource, Tag, Text,
+    LightLayer, MenuButtonEvent, MenuButtonValidEvent, MenuContainer, MenuPart, MenuScreen,
+    MenuScreenFactory, MenuScreenFrame, MenuScreenLayout, MenuScreenOpen, MenuSlotRulesEvent,
+    OnBlockPlacedByEvent, ParticleOptions, ScreenSlot, ServerHost, SoundSource, Tag, Text,
 };
 use rules::{Action, Cell, Input, Quarry as State, Upgrade, Upgrades};
 use std::{collections::HashMap, sync::Mutex};
@@ -492,6 +492,15 @@ pub(crate) struct QuarryMenu;
 
 #[mod_api::sunrise_part]
 impl MenuPart for QuarryMenu {
+    /// The start/stop button is the menu's one button.
+    fn menu_button_valid(&self, _host: &dyn Host, event: &mut MenuButtonValidEvent<'_>) -> Flow {
+        if event.id == TOGGLE {
+            Flow::Cancel
+        } else {
+            Flow::Continue
+        }
+    }
+
     /// The start/stop button.
     fn menu_button(&self, event: &mut MenuButtonEvent<'_>) {
         if event.context.id != TOGGLE {
@@ -724,19 +733,7 @@ fn submit(host: &dyn ClientHost, event: &mut BlockEntitySubmitEvent<'_>) {
         let face = Some(CubeFace::new(sprite));
         draw.push();
         draw.translate(at);
-        draw.cube(
-            from,
-            to,
-            [
-                face,
-                face,
-                face,
-                face,
-                face,
-                face,
-            ],
-            0xFF_FFFF,
-        );
+        draw.cube(from, to, [face, face, face, face, face, face], 0xFF_FFFF);
         draw.pop();
     };
     let (x0, z0) = ((min_x - pos[0]) as f32, (min_z - pos[2]) as f32);
@@ -803,19 +800,7 @@ fn submit(host: &dyn ClientHost, event: &mut BlockEntitySubmitEvent<'_>) {
         let face = Some(CubeFace::new(sprite));
         draw.push();
         draw.translate(at);
-        draw.cube(
-            from,
-            to,
-            [
-                face,
-                face,
-                face,
-                face,
-                face,
-                face,
-            ],
-            0xFF_FFFF,
-        );
+        draw.cube(from, to, [face, face, face, face, face, face], 0xFF_FFFF);
         draw.pop();
     };
 
