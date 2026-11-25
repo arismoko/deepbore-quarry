@@ -32,7 +32,7 @@ fn encode(quarry: &State) -> Option<Tag> {
 fn dig_direction(host: &dyn ServerHost, level: LevelRef, pos: [i32; 3]) -> rules::Facing {
     level
         .block_property(host, pos, "facing")
-        .and_then(|f| rules::Facing::away_from(f))
+        .and_then(rules::Facing::away_from)
         .unwrap_or(rules::Facing::North)
 }
 
