@@ -32,7 +32,7 @@ fn encode(quarry: &State) -> Option<Tag> {
 fn dig_direction(host: &dyn ServerHost, level: LevelRef, pos: [i32; 3]) -> rules::Facing {
     level
         .block_property(host, pos, "facing")
-        .and_then(|f| rules::Facing::away_from(&f))
+        .and_then(|f| rules::Facing::away_from(f))
         .unwrap_or(rules::Facing::North)
 }
 
@@ -198,7 +198,7 @@ fn classify(host: &mut dyn ServerHost, level: LevelRef, at: [i32; 3]) -> Cell {
         return Cell::Air;
     }
     let fluid = level.fluid_state(host, at).is_some_and(|f| f.amount > 0);
-    if fluid && level.block_property(host, at, "waterlogged").as_deref() != Some("true") {
+    if fluid && level.block_property(host, at, "waterlogged") != Some("true") {
         return Cell::Fluid;
     }
     if host
