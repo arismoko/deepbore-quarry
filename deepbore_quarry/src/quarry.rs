@@ -3,12 +3,12 @@
 use crate::{keys, rules, upgrade_of, world};
 use mod_api::{
     BlockEntityPart, BlockEntityRenderBoundingBoxEvent, BlockEntitySubmitEvent,
-    BlockEntityTickEvent, BlockEntityTicksEvent, BlockEntityUpdateTagEvent, BlockPart, BlockState,
-    BlockUpdateFlags, ClientHost, Compound, CubeFace, Direction, DrawContext, Flow, Host,
-    HostBlockStates, HostTransaction, ITEMS, ItemPart, ItemResource, ItemStack, LevelRef,
-    LightLayer, MenuButtonEvent, MenuButtonValidEvent, MenuContainer, MenuPart, MenuScreen,
-    MenuScreenFactory, MenuScreenFrame, MenuScreenLayout, MenuScreenOpen, MenuSlotRulesEvent,
-    OnBlockPlacedByEvent, ParticleOptions, ScreenSlot, ServerHost, SoundSource, Tag, Text,
+    BlockEntityTickEvent, BlockEntityUpdateTagEvent, BlockPart, BlockState, BlockUpdateFlags,
+    ClientHost, Compound, CubeFace, Direction, DrawContext, Flow, Host, HostBlockStates,
+    HostTransaction, ITEMS, ItemPart, ItemResource, ItemStack, LevelRef, LightLayer,
+    MenuButtonEvent, MenuButtonValidEvent, MenuContainer, MenuPart, MenuScreen, MenuScreenFactory,
+    MenuScreenFrame, MenuScreenLayout, MenuScreenOpen, MenuSlotRulesEvent, OnBlockPlacedByEvent,
+    ParticleOptions, ScreenSlot, ServerHost, SoundSource, Tag, Text,
 };
 use rules::{Action, Cell, Input, Quarry as State, Upgrade, Upgrades};
 use std::{collections::HashMap, sync::Mutex};
@@ -32,7 +32,7 @@ fn encode(quarry: &State) -> Option<Tag> {
 fn dig_direction(host: &dyn ServerHost, level: LevelRef, pos: [i32; 3]) -> rules::Facing {
     level
         .block_property(host, pos, "facing")
-        .and_then(|f| rules::Facing::away_from(&f))
+        .and_then(rules::Facing::away_from)
         .unwrap_or(rules::Facing::North)
 }
 
@@ -198,7 +198,7 @@ fn classify(host: &mut dyn ServerHost, level: LevelRef, at: [i32; 3]) -> Cell {
         return Cell::Air;
     }
     let fluid = level.fluid_state(host, at).is_some_and(|f| f.amount > 0);
-    if fluid && level.block_property(host, at, "waterlogged").as_deref() != Some("true") {
+    if fluid && level.block_property(host, at, "waterlogged") != Some("true") {
         return Cell::Fluid;
     }
     if host
@@ -346,7 +346,7 @@ fn hold_chunks(
 /// worked through the host, and what changed is written back.
 fn tick(event: &mut BlockEntityTickEvent<'_>) {
     let scope = &mut event.subject;
-    let Some((level, pos, items, was, data)) = scope.with_view(|view| {
+    let Some((level, pos, items, was, data, holder)) = scope.with_view(|view| {
         let items: Vec<Option<ItemStack>> = (0..rules::SLOTS as u32)
             .map(|i| view.item_slot(i).and_then(|s| s.to_owned()))
             .collect();
@@ -356,6 +356,7 @@ fn tick(event: &mut BlockEntityTickEvent<'_>) {
             items,
             load(view.nbt()),
             view.data_slots().to_vec(),
+            view.handle(),
         )
     }) else {
         return;
@@ -383,7 +384,7 @@ fn tick(event: &mut BlockEntityTickEvent<'_>) {
         }
     });
     if sync {
-        scope.host().block_entity_sync(pos);
+        let _ = holder.sync(scope.host());
     }
 }
 
@@ -673,9 +674,13 @@ static HEADS: Mutex<Option<HashMap<[i32; 3], Head>>> = Mutex::new(None);
 /// What clients get of a quarry: the square, whether it works, its pace and its target.
 fn update_tag(event: &mut BlockEntityUpdateTagEvent<'_>) -> Option<Compound> {
     let pos = event.pos;
-    let quarry = load(&event.entity.nbt)?;
+    let quarry = load(event.entity.nbt())?;
     let area = quarry.area(pos);
-    let upgrades = Upgrades::from_slots(&upgrade_slots(&event.entity.items));
+    let upgrades = Upgrades::from_slots(&upgrade_slots(
+        &(0..rules::SLOTS as u32)
+            .map(|i| event.entity.copy_item_slot(i))
+            .collect::<Vec<_>>(),
+    ));
     let target = quarry.target(pos);
     let [tx, ty, tz] = target.unwrap_or(pos);
     let view = vec![
@@ -683,7 +688,7 @@ fn update_tag(event: &mut BlockEntityUpdateTagEvent<'_>) -> Option<Compound> {
         area.min[1],
         area.max[0],
         area.max[1],
-        i32::from(event.entity.data.first() == Some(&0)),
+        i32::from(event.entity.data_slots().first() == Some(&0)),
         rules::ticks_per_block(upgrades.speed) as i32,
         i32::from(target.is_some()),
         tx,
@@ -697,7 +702,7 @@ fn update_tag(event: &mut BlockEntityUpdateTagEvent<'_>) -> Option<Compound> {
 
 fn submit(host: &dyn ClientHost, event: &mut BlockEntitySubmitEvent<'_>) {
     let pos = event.pos;
-    let Some(Tag::IntArray(view)) = event.entity.nbt.get(&"view".into()) else {
+    let Some(Tag::IntArray(view)) = event.entity.nbt().get(&"view".into()) else {
         return;
     };
     let &[
@@ -843,10 +848,6 @@ impl BlockPart for Quarry {}
 
 #[mod_api::sunrise_part]
 impl BlockEntityPart for Quarry {
-    fn block_entity_ticks(&self, _: &dyn Host, event: &mut BlockEntityTicksEvent<'_>) {
-        event.ticks = true;
-    }
-
     fn block_entity_tick(&self, event: &mut BlockEntityTickEvent<'_>) {
         tick(event);
     }

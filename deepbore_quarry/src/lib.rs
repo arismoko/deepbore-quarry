@@ -12,9 +12,9 @@ use mod_api::{
     BlockChangedEvent, BlockEntityTypeKey, BlockKey, BlocksEvent, BreakBlockEvent, Flow, Hooks,
     HostSide, InteractionResult, ItemKey, ItemsEvent, LevelHost, ModContainer, ParticleKey,
     PlayerLoggedInEvent, RegisterCommandsEvent, Registrar, RegistrationContext,
-    RightClickBlockEvent, ServerHost, ServerTickEvent, TicketController, ValidateTicketsEvent,
+    RightClickBlockEvent, ServerHost, ServerTickEvent, TicketController,
 };
-use std::sync::OnceLock;
+use std::sync::{Arc, OnceLock};
 
 /// The registry keys the mod asks about, looked up once at registration.
 pub(crate) struct Keys {
@@ -77,11 +77,12 @@ impl Hooks for Mod {
             },
         );
         r.menu_part(rules::MENU, quarry::QuarryMenu);
-        r.register_menu_screen(rules::MENU, std::sync::Arc::new(quarry::QuarryScreen))
+        r.register_menu_screen(rules::MENU, Arc::new(quarry::QuarryScreen))
             .expect("the quarry's menu is the mod's own");
         let item = r.item_key(rules::BLOCK);
         r.item_part(item, quarry::QuarryItem);
-        let tickets = r.register_ticket_controller(rules::BLOCK, true);
+        let tickets =
+            r.register_ticket_controller(rules::BLOCK, Some(Arc::new(world::validate_tickets)));
         let upgrades = UPGRADES.map(|id| (r.item_key(id), id));
         let _ = KEYS.set(Keys {
             block,
@@ -137,12 +138,6 @@ impl Hooks for Mod {
                 &event.dimension.key().to_string(),
                 [event.pos.x, event.pos.y, event.pos.z],
             );
-        }
-    }
-
-    fn validate_tickets(&self, host: &mut dyn ServerHost, event: &mut ValidateTicketsEvent<'_>) {
-        if event.controller == keys().tickets {
-            world::validate_tickets(host, event);
         }
     }
 
