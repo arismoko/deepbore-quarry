@@ -4,8 +4,8 @@
 use crate::{keys, rules};
 use mod_api::{
     Block, BlockProperties, BlocksEvent, Command, CommandArgumentValue, CommandInvocation,
-    CommandRegistration, Item, ItemsEvent, Rarity, ServerHost, Text, TicketOwner,
-    ValidateTicketsEvent, text::TextStyle,
+    CommandRegistration, Item, ItemsEvent, LevelRef, Rarity, ServerHost, Text, TicketOwner,
+    TicketValidation, text::TextStyle,
 };
 use rules::store;
 use std::{
@@ -209,16 +209,26 @@ pub(crate) fn quarry_gone(dimension: &str, pos: [i32; 3]) {
 }
 
 /// The world's saved tickets, as it loads: a quarry's ticket stays only while holds.json knows it.
-pub(crate) fn validate_tickets(host: &mut dyn ServerHost, event: &mut ValidateTicketsEvent<'_>) {
+pub(crate) fn validate_tickets(
+    host: &mut dyn ServerHost,
+    level: LevelRef,
+    tickets: &mut dyn TicketValidation,
+) {
+    let Some(dimension) = level.dimension().id(host).map(str::to_owned) else {
+        return;
+    };
     let Some(guard) = world(host) else {
         return;
     };
     let st = guard.as_ref().expect("opened");
-    let dimension = event.dimension.to_owned();
-    for (pos, _) in event.validation.block_tickets() {
-        if !st.loads.holds(&(dimension.clone(), pos)) {
-            event.validation.remove_block_tickets(pos);
-        }
+    let stale: Vec<[i32; 3]> = tickets
+        .block_tickets()
+        .keys()
+        .copied()
+        .filter(|pos| !st.loads.holds(&(dimension.clone(), *pos)))
+        .collect();
+    for pos in stale {
+        tickets.remove_block_tickets(pos);
     }
 }
 
