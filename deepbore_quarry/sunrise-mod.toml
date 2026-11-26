@@ -1,7 +1,7 @@
 # Deepbore Quarry for Sunrise: native code in src/ with its data/ and assets/.
 id = "deepbore_quarry"
 name = "Deepbore Quarry"
-version = "0.4.4"
+version = "0.4.5"
 description = "A machine that digs a square pit down to bedrock on furnace fuel and fills a chest beside it."
 authors = ["bioneisme", "arismoko"]
 license = "MIT"
@@ -11,4 +11,4 @@ side = "both"
 
 [native]
 game = "26.3"
-sunrise = "6a02076f89cd189d74d63492dda5b023fa85a38f"
+sunrise = "ba1f24e4ad41246b558230aa665539dc768b1287"
